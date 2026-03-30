@@ -1,8 +1,5 @@
 /**
- * train.js — Treinamento do modelo NLP com todos os corpora regionais
- *
- * Usa NlpManager (node-nlp) diretamente — mesmo loader do botResponse.js,
- * garantindo que o model.nlp salvo seja compatível com manager.import().
+ * train.js - model training with base corpora + generated feedback corpus.
  */
 
 const path = require('path');
@@ -16,37 +13,67 @@ const CORPORA = [
     'corpus-pt-br-nordestino.json',
     'corpus-pt-br-paulistano.json',
     'corpus-en-us.json',
+    'corpus-feedback.json',
 ];
 
-(async () => {
-    console.log('════════════════════════════════════════════════════');
-    console.log('  Treinamento com corpora regionais');
-    console.log('════════════════════════════════════════════════════');
+let trainingPromise = null;
+
+async function executeTraining() {
+    console.log('====================================================');
+    console.log('  Training model with corpora');
+    console.log('====================================================');
 
     const manager = new NlpManager({
         languages: ['pt', 'en'],
         forceNER: true,
         autoSave: false,
-        modelFileName: 'model.nlp'
+        modelFileName: 'model.nlp',
     });
 
+    let loadedCorpora = 0;
     for (const corpus of CORPORA) {
         const corpusPath = path.join(__dirname, corpus);
         try {
             await manager.addCorpus(corpusPath);
-            console.log(`  ✓ Carregado: ${corpus}`);
+            loadedCorpora += 1;
+            console.log(`  [ok] Loaded: ${corpus}`);
         } catch (err) {
-            console.warn(`  ✗ Falha ao carregar ${corpus}: ${err.message}`);
+            console.warn(`  [warn] Could not load ${corpus}: ${err.message}`);
         }
     }
 
-    console.log('\n  Treinando modelo...');
+    console.log('\n  Training...');
     await manager.train();
-
     manager.save('model.nlp');
 
-    console.log('\n════════════════════════════════════════════════════');
-    console.log('  Treinamento concluído! Modelo salvo em model.nlp');
-    console.log(`  Corpora processados: ${CORPORA.length}`);
-    console.log('════════════════════════════════════════════════════');
-})();
+    console.log('\n====================================================');
+    console.log('  Training complete. Model saved to model.nlp');
+    console.log(`  Corpora loaded: ${loadedCorpora}/${CORPORA.length}`);
+    console.log('====================================================');
+}
+
+async function train() {
+    if (trainingPromise) {
+        console.log('[train] Training already running, waiting for current run.');
+        return trainingPromise;
+    }
+
+    trainingPromise = executeTraining().finally(() => {
+        trainingPromise = null;
+    });
+
+    return trainingPromise;
+}
+
+module.exports = {
+    train,
+    CORPORA,
+};
+
+if (require.main === module) {
+    train().catch((err) => {
+        console.error(`[train] Fatal error: ${err.message}`);
+        process.exitCode = 1;
+    });
+}
+

@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "train": "node train.js",
-    "test": "node train.js && node input.js"
+    "test": "node train.js && node input.js",
+    "build": "node server.js"
   },
   "keywords": [
     "node.js",
